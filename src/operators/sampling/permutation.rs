@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use numpy::ndarray::Array1;
 use pymoors_macros::py_operator;
 
-use crate::operators::{Genes, GeneticOperator, SamplingOperator};
+use crate::operators::{GeneticOperator, IndividualGenes, SamplingOperator};
 use crate::random::RandomGenerator;
 
 #[py_operator("sampling")]
@@ -26,7 +26,7 @@ impl GeneticOperator for PermutationSampling {
 impl SamplingOperator for PermutationSampling {
     /// Generates a single individual of length `n_vars` where the genes
     /// are a shuffled permutation of the integers [0, 1, 2, ..., n_vars - 1].
-    fn sample_individual(&self, n_vars: usize, rng: &mut dyn RandomGenerator) -> Genes {
+    fn sample_individual(&self, n_vars: usize, rng: &mut dyn RandomGenerator) -> IndividualGenes {
         // 1) Create a vector of indices [0, 1, 2, ..., n_vars - 1]
         let mut indices: Vec<f64> = (0..n_vars).map(|i| i as f64).collect();
 
@@ -77,15 +77,15 @@ mod tests {
         // Use our fake RNG.
         let mut rng = FakeRandomGenerator::new();
 
-        let pop_size = 5;
+        let population_size = 5;
         let n_vars = 4; // For example, 4 variables
 
         // Generate the population. It is assumed that `operate` (defined via
-        // the SamplingOperator trait) generates pop_size individuals.
-        let population = sampler.operate(pop_size, n_vars, &mut rng);
+        // the SamplingOperator trait) generates population_size individuals.
+        let population = sampler.operate(population_size, n_vars, &mut rng);
 
         // Check the population shape.
-        assert_eq!(population.nrows(), pop_size);
+        assert_eq!(population.nrows(), population_size);
         assert_eq!(population.ncols(), n_vars);
 
         let expected = vec![3.0, 2.0, 1.0, 0.0];

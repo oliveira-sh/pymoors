@@ -4,6 +4,8 @@ import textwrap
 from ._pymoors import (
     Nsga2,
     Nsga3,
+    # AgeMoea, TODO: Enable algorithm
+    Rnsga2,
     BitFlipMutation,
     SwapMutation,
     GaussianMutation,
@@ -22,6 +24,7 @@ from ._pymoors import (
     CloseDuplicatesCleaner,
     NoFeasibleIndividualsError,
     InvalidParameterError,
+    DanAndDenisReferencePoints,
 )
 
 
@@ -114,6 +117,7 @@ def available_operators(
 __all__ = (
     "Nsga2",
     "Nsga3",
+    "Rnsga2",
     "BitFlipMutation",
     "SwapMutation",
     "GaussianMutation",
@@ -133,4 +137,5 @@ __all__ = (
     "NoFeasibleIndividualsError",
     "InvalidParameterError",
     "available_operators",
+    "DanAndDenisReferencePoints",
 )

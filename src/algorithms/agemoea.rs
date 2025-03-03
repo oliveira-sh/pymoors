@@ -9,20 +9,16 @@ use crate::helpers::parser::{
     unwrap_sampling_operator,
 };
 use crate::operators::selection::RankAndScoringSelection;
-use crate::operators::survival::Rnsga2ReferencePointsSurvival;
-use crate::operators::SurvivalOperator;
-
-use numpy::{PyArray2, PyArrayMethods};
+use crate::operators::survival::AgeMoeaSurvival;
 
 // Define the NSGA-II algorithm using the macro
-define_multiobj_pyclass!(Rnsga2);
+define_multiobj_pyclass!(AgeMoea);
 
 // Implement PyO3 methods
 #[pymethods]
-impl Rnsga2 {
+impl AgeMoea {
     #[new]
     #[pyo3(signature = (
-        reference_points,
         sampler,
         crossover,
         mutation,
@@ -31,7 +27,6 @@ impl Rnsga2 {
         population_size,
         n_offsprings,
         num_iterations,
-        epsilon = 0.001,
         mutation_rate=0.1,
         crossover_rate=0.9,
         keep_infeasible=false,
@@ -40,10 +35,9 @@ impl Rnsga2 {
         constraints_fn=None,
         lower_bound=None,
         upper_bound=None,
-        seed=None,
+        seed=None
     ))]
-    pub fn py_new<'py>(
-        reference_points: &Bound<'py, PyArray2<f64>>,
+    pub fn py_new(
         sampler: PyObject,
         crossover: PyObject,
         mutation: PyObject,
@@ -52,7 +46,6 @@ impl Rnsga2 {
         population_size: usize,
         n_offsprings: usize,
         num_iterations: usize,
-        epsilon: f64,
         mutation_rate: f64,
         crossover_rate: f64,
         keep_infeasible: bool,
@@ -85,15 +78,9 @@ impl Rnsga2 {
             None
         };
 
-        // Convert PyArray2 to Array2
-        let reference_points_array = reference_points.to_owned_array();
-
         // Create an instance of the selection/survival struct
-        let survival = Rnsga2ReferencePointsSurvival::new(reference_points_array, epsilon);
-        let selector_box = Box::new(RankAndScoringSelection::new_with_comparison(
-            survival.scoring_comparison(),
-        ));
-        let survivor_box = Box::new(survival);
+        let selector_box = Box::new(RankAndScoringSelection::new());
+        let survivor_box = Box::new(AgeMoeaSurvival::new());
 
         // Create the Rust struct
         let algorithm = MultiObjectiveAlgorithm::new(

@@ -56,13 +56,14 @@ def test_keep_infeasible():
         fitness_fn=binary_biobjective_infeasible,
         constraints_fn=infeasible_constraints,
         n_vars=5,
-        pop_size=100,
+        population_size=100,
         n_offsprings=32,
         num_iterations=20,
         mutation_rate=0.1,
         crossover_rate=0.9,
         duplicates_cleaner=None,
         keep_infeasible=True,
+        verbose=False,
     )
     algorithm.run()
 
@@ -76,7 +77,7 @@ def test_keep_infeasible_out_of_bounds():
         crossover=SinglePointBinaryCrossover(),
         fitness_fn=binary_biobjective_infeasible,
         n_vars=5,
-        pop_size=100,
+        population_size=100,
         n_offsprings=32,
         num_iterations=20,
         mutation_rate=0.1,
@@ -102,7 +103,7 @@ def test_remove_infeasible():
             fitness_fn=binary_biobjective_infeasible,
             constraints_fn=infeasible_constraints,
             n_vars=5,
-            pop_size=100,
+            population_size=100,
             n_offsprings=100,
             num_iterations=20,
             mutation_rate=0.1,

@@ -1,6 +1,9 @@
-use crate::genetic::{Fronts, Genes, GenesMut, Individual, Population, PopulationGenes};
+use crate::genetic::{
+    Fronts, FrontsExt, Individual, IndividualGenes, IndividualGenesMut, Population,
+    PopulationFitness, PopulationGenes,
+};
 use crate::random::RandomGenerator;
-use numpy::ndarray::Axis;
+use numpy::ndarray::{Array1, Axis};
 use rand::prelude::SliceRandom;
 use std::fmt::Debug;
 
@@ -20,19 +23,19 @@ pub trait GeneticOperator: Debug {
 
 pub trait SamplingOperator: GeneticOperator {
     /// Samples a single individual.
-    fn sample_individual(&self, n_vars: usize, rng: &mut dyn RandomGenerator) -> Genes;
+    fn sample_individual(&self, n_vars: usize, rng: &mut dyn RandomGenerator) -> IndividualGenes;
 
     /// Samples a population of individuals.
     fn operate(
         &self,
-        pop_size: usize,
+        population_size: usize,
         n_vars: usize,
         rng: &mut dyn RandomGenerator,
     ) -> PopulationGenes {
-        let mut population = Vec::with_capacity(pop_size);
+        let mut population = Vec::with_capacity(population_size);
 
         // Sample individuals and collect them
-        for _ in 0..pop_size {
+        for _ in 0..population_size {
             let individual = self.sample_individual(n_vars, rng);
             population.push(individual);
         }
@@ -47,7 +50,7 @@ pub trait SamplingOperator: GeneticOperator {
             .collect();
 
         // Create the shape: (number of individuals, number of genes)
-        let shape = (pop_size, num_genes);
+        let shape = (population_size, num_genes);
 
         // Use from_shape_vec to create PopulationGenes
         let population_genes = PopulationGenes::from_shape_vec(shape, flat_population)
@@ -65,16 +68,18 @@ pub trait MutationOperator: GeneticOperator {
     ///
     /// * `individual` - The individual to mutate, provided as a mutable view.
     /// * `rng` - A random number generator.
-    fn mutate<'a>(&self, individual: GenesMut<'a>, rng: &mut dyn RandomGenerator);
+    fn mutate<'a>(&self, individual: IndividualGenesMut<'a>, rng: &mut dyn RandomGenerator);
 
     /// Selects individuals for mutation based on the mutation rate.
     fn select_individuals_for_mutation(
         &self,
-        pop_size: usize,
+        population_size: usize,
         mutation_rate: f64,
         rng: &mut dyn RandomGenerator,
     ) -> Vec<bool> {
-        (0..pop_size).map(|_| rng.gen_bool(mutation_rate)).collect()
+        (0..population_size)
+            .map(|_| rng.gen_bool(mutation_rate))
+            .collect()
     }
 
     /// Applies the mutation operator to the entire population in place.
@@ -91,9 +96,10 @@ pub trait MutationOperator: GeneticOperator {
         rng: &mut dyn RandomGenerator,
     ) {
         // Get the number of individuals (i.e. the number of rows).
-        let pop_size = population.len_of(Axis(0));
+        let population_size = population.len_of(Axis(0));
         // Generate a boolean mask for which individuals will be mutated.
-        let mask: Vec<bool> = self.select_individuals_for_mutation(pop_size, mutation_rate, rng);
+        let mask: Vec<bool> =
+            self.select_individuals_for_mutation(population_size, mutation_rate, rng);
 
         // Iterate over the population using outer_iter_mut to get a mutable view for each row.
         for (i, mut individual) in population.outer_iter_mut().enumerate() {
@@ -113,10 +119,10 @@ pub trait CrossoverOperator: GeneticOperator {
     /// Performs crossover between two parents to produce two offspring.
     fn crossover(
         &self,
-        parent_a: &Genes,
-        parent_b: &Genes,
+        parent_a: &IndividualGenes,
+        parent_b: &IndividualGenes,
         rng: &mut dyn RandomGenerator,
-    ) -> (Genes, Genes);
+    ) -> (IndividualGenes, IndividualGenes);
 
     /// Applies the crossover operator to the population.
     /// Takes two parent populations and returns two offspring populations.
@@ -128,9 +134,9 @@ pub trait CrossoverOperator: GeneticOperator {
         crossover_rate: f64,
         rng: &mut dyn RandomGenerator,
     ) -> PopulationGenes {
-        let pop_size = parents_a.nrows();
+        let population_size = parents_a.nrows();
         assert_eq!(
-            pop_size,
+            population_size,
             parents_b.nrows(),
             "Parent populations must be of the same size"
         );
@@ -144,9 +150,9 @@ pub trait CrossoverOperator: GeneticOperator {
 
         // Prepare flat vectors to collect offspring genes
         let mut flat_offspring =
-            Vec::with_capacity(self.n_offsprings_per_crossover() * pop_size * num_genes);
+            Vec::with_capacity(self.n_offsprings_per_crossover() * population_size * num_genes);
 
-        for i in 0..pop_size {
+        for i in 0..population_size {
             let parent_a = parents_a.row(i).to_owned();
             let parent_b = parents_b.row(i).to_owned();
 
@@ -164,7 +170,10 @@ pub trait CrossoverOperator: GeneticOperator {
 
         // Create PopulationGenes directly from the flat vectors
         let offspring_population = PopulationGenes::from_shape_vec(
-            (self.n_offsprings_per_crossover() * pop_size, num_genes),
+            (
+                self.n_offsprings_per_crossover() * population_size,
+                num_genes,
+            ),
             flat_offspring,
         )
         .expect("Failed to create offspring population");
@@ -194,7 +203,7 @@ pub trait SelectionOperator: GeneticOperator {
     /// to ensure there are enough random indices.
     fn _select_participants(
         &self,
-        pop_size: usize,
+        population_size: usize,
         n_crossovers: usize,
         rng: &mut dyn RandomGenerator,
     ) -> Vec<Vec<usize>> {
@@ -202,9 +211,9 @@ pub trait SelectionOperator: GeneticOperator {
         let total_needed = n_crossovers * self.n_parents_per_crossover() * self.pressure();
         let mut all_indices = Vec::with_capacity(total_needed);
 
-        let n_perms = (total_needed + pop_size - 1) / pop_size; // Ceil division
+        let n_perms = (total_needed + population_size - 1) / population_size; // Ceil division
         for _ in 0..n_perms {
-            let mut perm: Vec<usize> = (0..pop_size).collect();
+            let mut perm: Vec<usize> = (0..population_size).collect();
             perm.shuffle(rng.rng());
             all_indices.extend_from_slice(&perm);
         }
@@ -235,9 +244,9 @@ pub trait SelectionOperator: GeneticOperator {
         n_crossovers: usize,
         rng: &mut dyn RandomGenerator,
     ) -> (Population, Population) {
-        let pop_size = population.len();
+        let population_size = population.len();
 
-        let participants = self._select_participants(pop_size, n_crossovers, rng);
+        let participants = self._select_participants(population_size, n_crossovers, rng);
 
         let mut winners = Vec::with_capacity(n_crossovers);
 
@@ -268,7 +277,105 @@ pub trait SelectionOperator: GeneticOperator {
     }
 }
 
+/// Controls how the diversity (crowding) metric is compared during tournament selection.
+#[derive(Clone, Debug)]
+pub enum SurvivalScoringComparison {
+    /// Larger survival scoring (e.g crowding sitance) is preferred.
+    Maximize,
+    /// Smaller survival scoring (crowding) metric is preferred.
+    Minimize,
+}
+
+/// Enum to provide context to the survival score computation.
+#[derive(Clone, Copy, Debug)]
+pub enum FrontContext {
+    First,     // The first (nondominated) front.
+    Inner,     // Subsequent fronts that fit entirely.
+    Splitting, // The front that must be partially selected (splitting).
+}
+
+/// The SurvivalOperator trait extends GeneticOperator and requires that concrete operators
+/// provide a method for computing the survival score from a front's fitness.
 pub trait SurvivalOperator: GeneticOperator {
+    /// Returns whether the survival scoring should be maximized or minimized.
+    fn scoring_comparison(&self) -> SurvivalScoringComparison {
+        SurvivalScoringComparison::Maximize
+    }
+
+    /// Computes the survival score for a given front's fitness.
+    /// This is the only method that needs to be overridden by each survival operator.
+    fn survival_score(
+        &self,
+        front_fitness: &PopulationFitness,
+        context: FrontContext,
+        rng: &mut dyn RandomGenerator,
+    ) -> Array1<f64>;
+
     /// Selects the individuals that will survive to the next generation.
-    fn operate(&self, fronts: &mut Fronts, n_survive: usize) -> Population;
+    /// The default implementation uses the survival score to select individuals.
+    fn operate(
+        &self,
+        fronts: &mut Fronts,
+        n_survive: usize,
+        rng: &mut dyn RandomGenerator,
+    ) -> Population {
+        // Drain all fronts and enumerate them.
+        let drained = fronts.drain(..).enumerate();
+        let mut survivors_parts: Vec<Population> = Vec::new();
+        let mut n_survivors = 0;
+
+        for (i, mut front) in drained {
+            // Save the length of the current front before any move.
+            let front_len = front.len();
+
+            // Determine the context: first front is First, later fronts are Inner.
+            let context = if i == 0 {
+                FrontContext::First
+            } else {
+                FrontContext::Inner
+            };
+
+            if n_survivors + front_len <= n_survive {
+                // The entire front fits.
+                let score = self.survival_score(&front.fitness, context, rng);
+                front
+                    .set_survival_score(score)
+                    .expect("Failed to set survival score");
+                survivors_parts.push(front);
+                n_survivors += front_len;
+            } else {
+                // Splitting front: only part of the front is needed.
+                let remaining = n_survive - n_survivors;
+                if remaining > 0 {
+                    // Use Splitting context regardless of i.
+                    let score = self.survival_score(&front.fitness, FrontContext::Splitting, rng);
+                    front
+                        .set_survival_score(score)
+                        .expect("Failed to set survival score for splitting front");
+                    // Clone survival_score vector for sorting.
+                    let scores = front
+                        .survival_score
+                        .clone()
+                        .expect("No survival score set for splitting front");
+                    // Get indices for the current front.
+                    let mut indices: Vec<usize> = (0..front_len).collect();
+                    indices.sort_by(|&i, &j| match self.scoring_comparison() {
+                        SurvivalScoringComparison::Maximize => scores[j]
+                            .partial_cmp(&scores[i])
+                            .unwrap_or(std::cmp::Ordering::Equal),
+                        SurvivalScoringComparison::Minimize => scores[i]
+                            .partial_cmp(&scores[j])
+                            .unwrap_or(std::cmp::Ordering::Equal),
+                    });
+                    // Select exactly the required number of individuals.
+                    let selected_indices: Vec<usize> =
+                        indices.into_iter().take(remaining).collect();
+                    let partial = front.selected(&selected_indices);
+                    survivors_parts.push(partial);
+                }
+                break;
+            }
+        }
+        survivors_parts.to_population()
+    }
 }

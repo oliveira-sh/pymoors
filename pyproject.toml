@@ -39,6 +39,7 @@ dynamic = [
 [dependency-groups]
 testing = [
     "maturin",
+    "scipy",
     "pytest",
     "pytest-cov",
     "pytest-benchmark",
@@ -50,7 +51,9 @@ linting = [
     "pytest"
 ]
 docs = [
+    "matplotlib",
     "mkdocs",
+    "mkdocs-jupyter",
     "mkdocs-material",
     "pymdown-extensions",
     "neoteroi-mkdocs"

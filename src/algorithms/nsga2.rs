@@ -8,7 +8,7 @@ use crate::helpers::parser::{
     unwrap_crossover_operator, unwrap_duplicates_cleaner, unwrap_mutation_operator,
     unwrap_sampling_operator,
 };
-use crate::operators::selection::RankAndCrowdingSelection;
+use crate::operators::selection::RankAndScoringSelection;
 use crate::operators::survival::RankCrowdingSurvival;
 
 // Define the NSGA-II algorithm using the macro
@@ -24,7 +24,7 @@ impl Nsga2 {
         mutation,
         fitness_fn,
         n_vars,
-        pop_size,
+        population_size,
         n_offsprings,
         num_iterations,
         mutation_rate=0.1,
@@ -43,7 +43,7 @@ impl Nsga2 {
         mutation: PyObject,
         fitness_fn: PyObject,
         n_vars: usize,
-        pop_size: usize,
+        population_size: usize,
         n_offsprings: usize,
         num_iterations: usize,
         mutation_rate: f64,
@@ -79,7 +79,7 @@ impl Nsga2 {
         };
 
         // Create an instance of the selection/survival struct
-        let selector_box = Box::new(RankAndCrowdingSelection::new());
+        let selector_box = Box::new(RankAndScoringSelection::new());
         let survivor_box = Box::new(RankCrowdingSurvival::new());
 
         // Create the Rust struct
@@ -92,7 +92,7 @@ impl Nsga2 {
             duplicates_box,
             fitness_closure,
             n_vars,
-            pop_size,
+            population_size,
             n_offsprings,
             num_iterations,
             mutation_rate,
