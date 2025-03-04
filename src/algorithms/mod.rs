@@ -166,6 +166,8 @@ impl MultiObjectiveAlgorithm {
             duplicates_cleaner,
             mutation_rate,
             crossover_rate,
+            lower_bound,
+            upper_bound,
         );
 
         // Clean duplicates if the cleaner is enabled.

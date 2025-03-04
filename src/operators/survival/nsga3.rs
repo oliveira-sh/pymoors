@@ -6,7 +6,7 @@ use ndarray_stats::QuantileExt;
 use crate::genetic::{Fronts, Population, PopulationFitness};
 use crate::helpers::extreme_points::get_nideal;
 use crate::operators::survival::helpers::HyperPlaneNormalization;
-use crate::operators::{FrontContext, GeneticOperator, SurvivalOperator};
+use crate::operators::{GeneticOperator, SurvivalOperator};
 use crate::random::RandomGenerator;
 
 /// Implementation of the survival operator for the NSGA3 algorithm presented in the paper
@@ -90,12 +90,11 @@ impl Nsga3ReferencePointsSurvival {
 }
 
 impl SurvivalOperator for Nsga3ReferencePointsSurvival {
-    fn survival_score(
+    fn set_survival_score(
         &self,
-        _front_fitness: &PopulationFitness,
-        _context: FrontContext,
+        _fronts: &mut crate::genetic::Fronts,
         _rng: &mut dyn RandomGenerator,
-    ) -> Array1<f64> {
+    ) {
         unimplemented!("NSGA3 doesn't use survival score. It uses random tournament which doesn't depend on the score")
     }
 

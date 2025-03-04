@@ -5,9 +5,7 @@ use ndarray::{Array1, Array2, ArrayView1, Axis};
 
 use crate::genetic::PopulationFitness;
 use crate::helpers::extreme_points::{get_nadir, get_nideal};
-use crate::operators::{
-    FrontContext, GeneticOperator, SurvivalOperator, SurvivalScoringComparison,
-};
+use crate::operators::{GeneticOperator, SurvivalOperator, SurvivalScoringComparison};
 use crate::random::RandomGenerator;
 
 /// Implementation of the survival operator for the R-NSGA2 algorithm presented in the paper
@@ -39,34 +37,45 @@ impl SurvivalOperator for Rnsga2ReferencePointsSurvival {
         SurvivalScoringComparison::Minimize
     }
 
-    fn survival_score(
+    fn set_survival_score(
         &self,
-        front_fitness: &PopulationFitness,
-        context: FrontContext,
+        fronts: &mut crate::genetic::Fronts,
         rng: &mut dyn RandomGenerator,
-    ) -> Array1<f64> {
-        let nadir = get_nadir(&front_fitness);
-        let nideal = get_nideal(&front_fitness);
-        let n_objectives = front_fitness.ncols();
+    ) {
+        let len_fronts = fronts.len();
+        let n_objectives = fronts[0].fitness.ncols();
         let weights = Array1::from_elem(n_objectives, 1.0 / (n_objectives as f64));
-        if let FrontContext::Splitting = context {
-            assign_crowding_distance_splitting_front(
-                &front_fitness,
+
+        for front in fronts.iter_mut().take(len_fronts.saturating_sub(1)) {
+            let nadir = get_nadir(&front.fitness);
+            let nideal = get_nideal(&front.fitness);
+            let survival_score = assign_crowding_distance_to_inner_front(
+                &front.fitness,
+                &self.reference_points,
+                &weights,
+                &nadir,
+                &nideal,
+            );
+            front
+                .set_survival_score(survival_score)
+                .expect("Failed to set survival score in Rsga2");
+        }
+        // Process the last front with the special crowding_distance_last_front function
+        if let Some(last_front) = fronts.last_mut() {
+            let nadir = get_nadir(&last_front.fitness);
+            let nideal = get_nideal(&last_front.fitness);
+            let survival_score = assign_crowding_distance_splitting_front(
+                &last_front.fitness,
                 &self.reference_points,
                 &weights,
                 self.epsilon,
                 &nadir,
                 &nideal,
                 rng,
-            )
-        } else {
-            assign_crowding_distance_to_inner_front(
-                &front_fitness,
-                &self.reference_points,
-                &weights,
-                &nadir,
-                &nideal,
-            )
+            );
+            last_front
+                .set_survival_score(survival_score)
+                .expect("Failed to set survival score in Rsga2");
         }
     }
 }

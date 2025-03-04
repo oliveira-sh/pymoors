@@ -4,7 +4,7 @@ use std::fmt::Debug;
 use ndarray::Array1;
 
 use crate::genetic::PopulationFitness;
-use crate::operators::{FrontContext, GeneticOperator, SurvivalOperator};
+use crate::operators::{GeneticOperator, SurvivalOperator};
 use crate::random::RandomGenerator;
 
 #[derive(Clone, Debug)]
@@ -23,13 +23,17 @@ impl RankCrowdingSurvival {
 }
 
 impl SurvivalOperator for RankCrowdingSurvival {
-    fn survival_score(
+    fn set_survival_score(
         &self,
-        front_fitness: &PopulationFitness,
-        _context: FrontContext,
+        fronts: &mut crate::genetic::Fronts,
         _rng: &mut dyn RandomGenerator,
-    ) -> Array1<f64> {
-        crowding_distance(&front_fitness)
+    ) {
+        for front in fronts.iter_mut() {
+            let crowding_distance = crowding_distance(&front.fitness);
+            front
+                .set_survival_score(crowding_distance)
+                .expect("Failed to set survival score in Nsga2");
+        }
     }
 }
 

@@ -16,6 +16,8 @@ pub struct Evolve {
     pub duplicates_cleaner: Option<Box<dyn PopulationCleaner>>,
     mutation_rate: f64,
     crossover_rate: f64,
+    lower_bound: Option<f64>,
+    upper_bound: Option<f64>,
 }
 
 #[derive(Debug)]
@@ -53,6 +55,8 @@ impl Evolve {
         duplicates_cleaner: Option<Box<dyn PopulationCleaner>>,
         mutation_rate: f64,
         crossover_rate: f64,
+        lower_bound: Option<f64>,
+        upper_bound: Option<f64>,
     ) -> Self {
         Self {
             selection,
@@ -61,10 +65,15 @@ impl Evolve {
             duplicates_cleaner,
             mutation_rate,
             crossover_rate,
+            lower_bound,
+            upper_bound,
         }
     }
 
-    /// Single-step crossover + mutation for a batch of selected parents.
+    /// Performs a single-step crossover + mutation for a batch of selected parents.
+    ///
+    /// Before returning the offsprings (PopulationGenes Array2), it clamps each gene
+    /// to the specified lower and upper bounds (if provided).
     fn mating_batch(
         &self,
         parents_a: &PopulationGenes,
@@ -78,10 +87,21 @@ impl Evolve {
         // 2) Perform mutation in one batch (often in-place).
         self.mutation
             .operate(&mut offsprings, self.mutation_rate, rng);
+        // Clamp each gene's value if bounds are provided.
+        if let Some(lb) = self.lower_bound {
+            for x in offsprings.iter_mut() {
+                *x = (*x).max(lb);
+            }
+        }
+        if let Some(ub) = self.upper_bound {
+            for x in offsprings.iter_mut() {
+                *x = (*x).min(ub);
+            }
+        }
         offsprings
     }
 
-    /// Cleans duplicates in `genes` optionally comparing against a reference population.
+    /// Cleans duplicates in `genes`, optionally comparing against a reference population.
     /// If no duplicates_cleaner is provided, returns the genes unchanged.
     pub fn clean_duplicates(
         &self,
@@ -98,12 +118,12 @@ impl Evolve {
     /// Generates up to `n_offsprings` unique offspring in multiple iterations (up to `max_iter`).
     ///
     /// The logic is as follows:
-    /// 1) Accumulate offspring in a Vec<Vec<f64>>.
-    /// 2) On each iteration, generate a new batch of offspring via mating.
+    /// 1) Accumulate offspring rows in a Vec<Vec<f64>>.
+    /// 2) In each iteration, generate a new batch of offspring via mating_batch.
     /// 3) Clean duplicates within the new offspring.
     /// 4) Clean duplicates between the new offspring and the current population.
-    /// 5) **Clean duplicates between the new offspring and the already accumulated offspring.**
-    /// 6) Append the new (unique) offspring to the accumulator.
+    /// 5) Clean duplicates between the new offspring and the already accumulated offspring.
+    /// 6) Append the new unique offspring to the accumulator.
     /// 7) Repeat until the desired number is reached.
     pub fn evolve(
         &self,
@@ -112,14 +132,14 @@ impl Evolve {
         max_iter: usize,
         rng: &mut dyn RandomGenerator,
     ) -> Result<PopulationGenes, EvolveError> {
-        // We'll accumulate offspring rows in a Vec<Vec<f64>>
+        // Accumulate offspring rows in a Vec<Vec<f64>>
         let mut all_offsprings: Vec<Vec<f64>> = Vec::with_capacity(n_offsprings);
         let num_genes = population.genes.ncols();
         let mut iterations = 0;
 
         while all_offsprings.len() < n_offsprings && iterations < max_iter {
             let remaining = n_offsprings - all_offsprings.len();
-            // NOTE: pymoors is currently a 2-parents 2-children crossover.
+            // NOTE: Currently, pymoors implements 2-parent crossover producing 2 children.
             let crossover_needed = remaining / 2 + 1;
             let (parents_a, parents_b) = self.selection.operate(population, crossover_needed, rng);
 
@@ -127,9 +147,9 @@ impl Evolve {
             let mut new_offsprings = self.mating_batch(&parents_a.genes, &parents_b.genes, rng);
             // Clean duplicates within the new offspring (internal cleaning)
             new_offsprings = self.clean_duplicates(new_offsprings, None);
-            // Clean duplicates between new offspring and the current population
+            // Clean duplicates between new offspring and the current population.
             new_offsprings = self.clean_duplicates(new_offsprings, Some(&population.genes));
-            // If we already have accumulated offspring, clean new offspring against them.
+            // If we have already accumulated offspring, clean new offspring against them.
             if !all_offsprings.is_empty() {
                 let acc_array = PopulationGenes::from_shape_vec(
                     (all_offsprings.len(), num_genes),
@@ -156,7 +176,7 @@ impl Evolve {
             });
         }
 
-        // Convert Vec<Vec<f64>> into a single Array2
+        // Convert Vec<Vec<f64>> into a single Array2.
         let all_offsprings_len = all_offsprings.len();
         let offspring_data: Vec<f64> = all_offsprings.into_iter().flatten().collect();
         let offspring_array =

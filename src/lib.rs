@@ -35,7 +35,7 @@ fn _pymoors(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Nsga2>()?;
     m.add_class::<Nsga3>()?;
     m.add_class::<Rnsga2>()?;
-    // m.add_class::<AgeMoea>()?; TODO: Enable it once survival issues are fixed
+    m.add_class::<AgeMoea>()?;
 
     // Add classes from operators
     m.add_class::<PyBitFlipMutation>()?;

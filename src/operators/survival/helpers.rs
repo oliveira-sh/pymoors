@@ -31,8 +31,7 @@ pub trait HyperPlaneNormalization {
         let solution_ndarray: ArrayView1<f64> = solution_ndarray
             .into_shape_with_order(solution_ndarray.len())
             .unwrap();
-
-        if solution_ndarray.iter().any(|&x| !x.is_finite()) {
+        if solution_ndarray.iter().any(|&x| !x.is_finite() || x <= 0.0) {
             // this is the case for singullar matrices
             get_nadir(&population_fitness)
         } else {

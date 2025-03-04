@@ -6,6 +6,7 @@ from pymoors import (
     GaussianMutation,
     CloseDuplicatesCleaner,
     SimulatedBinaryCrossover,
+    AgeMoea,
     Nsga2,
     Nsga3,
     Rnsga2,
@@ -64,6 +65,7 @@ def constraints_biobjective(population_genes: TwoDArray) -> TwoDArray:
     [
         (Nsga2, {"seed": 42}),
         (Nsga2, {"seed": None}),
+        (AgeMoea, {"seed": 42}),
         (
             Nsga3,
             {

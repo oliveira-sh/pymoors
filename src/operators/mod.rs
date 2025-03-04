@@ -1,9 +1,8 @@
 use crate::genetic::{
-    Fronts, FrontsExt, Individual, IndividualGenes, IndividualGenesMut, Population,
-    PopulationFitness, PopulationGenes,
+    Fronts, FrontsExt, Individual, IndividualGenes, IndividualGenesMut, Population, PopulationGenes,
 };
 use crate::random::RandomGenerator;
-use numpy::ndarray::{Array1, Axis};
+use numpy::ndarray::Axis;
 use rand::prelude::SliceRandom;
 use std::fmt::Debug;
 
@@ -286,14 +285,6 @@ pub enum SurvivalScoringComparison {
     Minimize,
 }
 
-/// Enum to provide context to the survival score computation.
-#[derive(Clone, Copy, Debug)]
-pub enum FrontContext {
-    First,     // The first (nondominated) front.
-    Inner,     // Subsequent fronts that fit entirely.
-    Splitting, // The front that must be partially selected (splitting).
-}
-
 /// The SurvivalOperator trait extends GeneticOperator and requires that concrete operators
 /// provide a method for computing the survival score from a front's fitness.
 pub trait SurvivalOperator: GeneticOperator {
@@ -304,12 +295,7 @@ pub trait SurvivalOperator: GeneticOperator {
 
     /// Computes the survival score for a given front's fitness.
     /// This is the only method that needs to be overridden by each survival operator.
-    fn survival_score(
-        &self,
-        front_fitness: &PopulationFitness,
-        context: FrontContext,
-        rng: &mut dyn RandomGenerator,
-    ) -> Array1<f64>;
+    fn set_survival_score(&self, fronts: &mut Fronts, rng: &mut dyn RandomGenerator);
 
     /// Selects the individuals that will survive to the next generation.
     /// The default implementation uses the survival score to select individuals.
@@ -319,28 +305,18 @@ pub trait SurvivalOperator: GeneticOperator {
         n_survive: usize,
         rng: &mut dyn RandomGenerator,
     ) -> Population {
-        // Drain all fronts and enumerate them.
-        let drained = fronts.drain(..).enumerate();
+        // Set survival score
+        self.set_survival_score(fronts, rng);
+
+        // Drain all fronts.
+        let drained = fronts.drain(..);
         let mut survivors_parts: Vec<Population> = Vec::new();
         let mut n_survivors = 0;
 
-        for (i, mut front) in drained {
-            // Save the length of the current front before any move.
+        for front in drained {
             let front_len = front.len();
-
-            // Determine the context: first front is First, later fronts are Inner.
-            let context = if i == 0 {
-                FrontContext::First
-            } else {
-                FrontContext::Inner
-            };
-
             if n_survivors + front_len <= n_survive {
                 // The entire front fits.
-                let score = self.survival_score(&front.fitness, context, rng);
-                front
-                    .set_survival_score(score)
-                    .expect("Failed to set survival score");
                 survivors_parts.push(front);
                 n_survivors += front_len;
             } else {
@@ -348,10 +324,6 @@ pub trait SurvivalOperator: GeneticOperator {
                 let remaining = n_survive - n_survivors;
                 if remaining > 0 {
                     // Use Splitting context regardless of i.
-                    let score = self.survival_score(&front.fitness, FrontContext::Splitting, rng);
-                    front
-                        .set_survival_score(score)
-                        .expect("Failed to set survival score for splitting front");
                     // Clone survival_score vector for sorting.
                     let scores = front
                         .survival_score
