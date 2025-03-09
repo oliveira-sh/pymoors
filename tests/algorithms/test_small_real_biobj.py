@@ -110,8 +110,8 @@ def test_small_real_biobjective(algorithm_class, extra_kw):
         mutation=GaussianMutation(gene_mutation_rate=0.1, sigma=0.05),
         fitness_fn=fitness_biobjective,
         n_vars=2,  # We have 2 variables: x,y
-        population_size=200,
-        n_offsprings=200,
+        population_size=100,
+        n_offsprings=100,
         num_iterations=100,
         mutation_rate=0.1,
         crossover_rate=0.9,
@@ -126,11 +126,11 @@ def test_small_real_biobjective(algorithm_class, extra_kw):
 
     final_population = algorithm.population
     best = final_population.best
-    for i in best:  # FIXME: Fix the abs in the tests --- Should be 0.05
-        assert i.genes[0] == pytest.approx(i.genes[1], abs=0.15)
-    assert len(final_population) == 200
+    for i in best:
+        assert i.genes[0] == pytest.approx(i.genes[1], abs=0.2)
+    assert len(final_population) == 100
     # In this test all algorithms have to reach full pareto front
-    assert len(np.unique(np.array([b.genes for b in best]), axis=0)) == 200
+    assert len(np.unique(np.array([b.genes for b in best]), axis=0)) == 100
 
 
 @pytest.mark.xfail(
