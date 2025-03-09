@@ -20,23 +20,41 @@ jobs:
         with:
           python-version: ${{ env.DEFAULT_PYTHON }}
 
-      - name: install uv
-        uses: astral-sh/setup-uv@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-          enable-cache: true
-
       - name: install rust stable
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install pymoors
-        run: |
-          uv sync --group testing
-          uv run maturin develop --release --uv
-          uv pip install pytest-codspeed
+      - name: install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ env.DEFAULT_PYTHON }}
+          enable-cache: true
 
-      # FIXME: Looks like is not running in an optimized mode in the runner
-      # - name: Run benchmarks
-      #   uses: CodSpeedHQ/action@v3
-      #   with:
-      #     run: uv run pytest tests/benchmarks --codspeed
+      - name: sync uv environment
+        run: uv sync --group testing
+
+      - name: build pymoors optimized wheel
+        id: build
+        uses: PyO3/maturin-action@v1
+        with:
+          manylinux: auto
+          args: --release --out dist --interpreter  ${{ env.DEFAULT_PYTHON }}
+          rust-toolchain: stable
+
+      - name: find built wheel
+        id: find_wheel
+        run: |
+          echo "Finding wheel"
+          WHEEL_PATH=$(ls dist/*.whl)
+          echo "Found wheel: $WHEEL_PATH"
+          echo "wheel=$WHEEL_PATH" >> $GITHUB_OUTPUT
+        shell: bash
+
+      - name: install built wheel
+        run: uv run pip install ${{ steps.find_wheel.outputs.wheel }} --force-reinstall
+
+      - name: Run benchmarks
+        uses: CodSpeedHQ/action@v3
+        with:
+          run: uv run pytest -s -vvv tests/benchmarks --codspeed
+        env:
+          CODSPEED_RUNNER_MODE: "walltime"
