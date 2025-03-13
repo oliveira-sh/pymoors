@@ -3,6 +3,7 @@ use std::fmt::Debug;
 
 use ndarray::Array1;
 
+use crate::algorithms::AlgorithmContext;
 use crate::genetic::{Fronts, PopulationFitness};
 use crate::operators::{GeneticOperator, SurvivalOperator};
 use crate::random::RandomGenerator;
@@ -23,7 +24,12 @@ impl RankCrowdingSurvival {
 }
 
 impl SurvivalOperator for RankCrowdingSurvival {
-    fn set_survival_score(&self, fronts: &mut Fronts, _rng: &mut dyn RandomGenerator) {
+    fn set_survival_score(
+        &self,
+        fronts: &mut Fronts,
+        _rng: &mut dyn RandomGenerator,
+        _algorithm_context: &AlgorithmContext,
+    ) {
         for front in fronts.iter_mut() {
             let crowding_distance = crowding_distance(&front.fitness);
             front
@@ -199,7 +205,9 @@ mod tests {
 
         let selector = RankCrowdingSurvival::new();
         let mut rng = NoopRandomGenerator::new();
-        selector.set_survival_score(&mut fronts, &mut rng);
+        // create context (not used in the algorithm)
+        let _context = AlgorithmContext::new(10, 10, 5, 2, 1, None, None, None);
+        selector.set_survival_score(&mut fronts, &mut rng, &_context);
 
         let expected: Array1<f64> = array![
             std::f64::INFINITY,
@@ -218,10 +226,12 @@ mod tests {
         let fitness: Array2<f64> = array![[0.1, 0.9], [0.2, 0.8], [0.3, 0.7]];
         let population = Population::new(genes.clone(), fitness.clone(), None, None);
         let n_survive = 3;
-        let selector = RankCrowdingSurvival;
+        let mut selector = RankCrowdingSurvival;
         assert_eq!(selector.name(), "RankCrowdingSurvival");
-        let mut rng = NoopRandomGenerator::new();
-        let new_population = selector.operate(population, n_survive, &mut rng);
+        let mut _rng = NoopRandomGenerator::new();
+        // create context (not used in the algorithm)
+        let _context = AlgorithmContext::new(10, 10, 5, 2, 1, None, None, None);
+        let new_population = selector.operate(population, n_survive, &mut _rng, &_context);
 
         // The resulting population should remain unchanged.
         assert_eq!(new_population.genes, genes);
@@ -262,9 +272,14 @@ mod tests {
         let population = Population::new(genes.clone(), fitness.clone(), None, None);
         let n_survive = 4;
 
-        let selector = RankCrowdingSurvival;
-        let mut rng = NoopRandomGenerator::new();
-        let new_population = selector.operate(population, n_survive, &mut rng);
+        let mut selector = RankCrowdingSurvival;
+        let mut _rng = NoopRandomGenerator::new();
+        // create context (not used in the algorithm)
+        let _context = AlgorithmContext::new(10, 10, 5, 2, 1, None, None, None);
+        let new_population = selector.operate(population, n_survive, &mut _rng, &_context);
+
+        // The final population must have 4 individuals.
+        assert_eq!(new_population.len(), n_survive);
 
         // The final population should have 4 individuals.
         // Expected outcome:

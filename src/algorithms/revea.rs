@@ -1,3 +1,8 @@
+use ndarray::Array2;
+use numpy::{PyArray2, PyArrayMethods};
+use pyo3::exceptions::PyTypeError;
+use pyo3::prelude::*;
+
 use crate::define_multiobj_pyclass;
 use crate::helpers::functions::{
     create_population_constraints_closure, create_population_fitness_closure,
@@ -7,20 +12,15 @@ use crate::helpers::parser::{
     unwrap_sampling_operator,
 };
 use crate::operators::selection::RandomSelection;
-use crate::operators::{
-    survival::helpers::PyStructuredReferencePointsEnum, survival::nsga3::Nsga3ReferencePoints,
-    survival::Nsga3ReferencePointsSurvival,
-};
+use crate::operators::survival::helpers::PyStructuredReferencePointsEnum;
+use crate::operators::survival::ReveaReferencePointsSurvival;
 
-use numpy::{PyArray2, PyArrayMethods};
-use pyo3::exceptions::PyTypeError;
-use pyo3::prelude::*;
+// Define the Revea algorithm using the macro
+define_multiobj_pyclass!(Revea);
 
-// Define the NSGA-III algorithm using your macro.
-define_multiobj_pyclass!(Nsga3);
-
+// Implement PyO3 methods
 #[pymethods]
-impl Nsga3 {
+impl Revea {
     #[new]
     #[pyo3(signature = (
         reference_points,
@@ -32,6 +32,8 @@ impl Nsga3 {
         population_size,
         n_offsprings,
         n_iterations,
+        alpha=2.0,
+        frequency=0.2,
         mutation_rate=0.1,
         crossover_rate=0.9,
         keep_infeasible=false,
@@ -40,9 +42,9 @@ impl Nsga3 {
         constraints_fn=None,
         lower_bound=None,
         upper_bound=None,
-        seed=None
+        seed=None,
     ))]
-    pub fn py_new(
+    pub fn py_new<'py>(
         reference_points: PyObject,
         sampler: PyObject,
         crossover: PyObject,
@@ -52,32 +54,36 @@ impl Nsga3 {
         population_size: usize,
         n_offsprings: usize,
         n_iterations: usize,
+        alpha: f64,
+        frequency: f64,
         mutation_rate: f64,
         crossover_rate: f64,
         keep_infeasible: bool,
         verbose: bool,
         duplicates_cleaner: Option<PyObject>,
         constraints_fn: Option<PyObject>,
+        // Optional lower bound for each gene.
         lower_bound: Option<f64>,
+        // Optional upper bound for each gene.
         upper_bound: Option<f64>,
         seed: Option<u64>,
     ) -> PyResult<Self> {
+        // Unwrap the genetic operators
         Python::with_gil(|py| {
             // First, try to extract the object as our custom type.
-            let reference_points_array: Nsga3ReferencePoints = if let Ok(custom_obj) =
+            let reference_points_array: Array2<f64> = if let Ok(custom_obj) =
                 reference_points.extract::<PyStructuredReferencePointsEnum>(py)
             {
-                Nsga3ReferencePoints::new(custom_obj.generate(), false)
+                custom_obj.generate()
             } else if let Ok(rp_maybe_array) = reference_points.downcast_bound::<PyArray2<f64>>(py)
             {
-                Nsga3ReferencePoints::new(rp_maybe_array.readonly().as_array().to_owned(), true)
+                rp_maybe_array.readonly().as_array().to_owned()
             } else {
                 return Err(PyTypeError::new_err(
-                        "reference_points must be either a custom reference points class or a NumPy array.",
-                    ));
+                     "reference_points must be either a custom reference points class or a NumPy array.",
+                 ));
             };
 
-            // Unwrap the genetic operators.
             let sampler_box = unwrap_sampling_operator(sampler)?;
             let crossover_box = unwrap_crossover_operator(crossover)?;
             let mutation_box = unwrap_mutation_operator(mutation)?;
@@ -87,20 +93,25 @@ impl Nsga3 {
                 None
             };
 
-            // Build the mandatory population-level fitness closure.
+            // Build the MANDATORY population-level fitness closure
             let fitness_closure = create_population_fitness_closure(fitness_fn)?;
-            // Build the optional constraints closure.
+
+            // Build OPTIONAL population-level constraints closure
             let constraints_closure = if let Some(py_obj) = constraints_fn {
                 Some(create_population_constraints_closure(py_obj)?)
             } else {
                 None
             };
 
-            // Create instances of the selection and survival structs.
+            // Create an instance of the selection/survival struct
+            let survivor_box = Box::new(ReveaReferencePointsSurvival::new(
+                reference_points_array,
+                alpha,
+                frequency,
+            ));
             let selector_box = Box::new(RandomSelection::new());
-            let survivor_box = Box::new(Nsga3ReferencePointsSurvival::new(reference_points_array));
 
-            // Build the algorithm.
+            // Create the Rust struct
             let algorithm = MultiObjectiveAlgorithm::new(
                 sampler_box,
                 selector_box,
@@ -123,7 +134,9 @@ impl Nsga3 {
                 seed,
             )?;
 
-            Ok(Nsga3 { algorithm })
+            Ok(Self {
+                algorithm: algorithm,
+            })
         })
     }
 }

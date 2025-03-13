@@ -3,13 +3,14 @@ use std::fmt::Debug;
 use numpy::ndarray::Axis;
 use rand::prelude::SliceRandom;
 
-use crate::random::RandomGenerator;
 use crate::{
+    algorithms::AlgorithmContext,
     genetic::{
         Fronts, FrontsExt, Individual, IndividualGenes, IndividualGenesMut, Population,
         PopulationGenes,
     },
     non_dominated_sorting::build_fronts,
+    random::RandomGenerator,
 };
 
 pub mod crossover;
@@ -301,20 +302,26 @@ pub trait SurvivalOperator: GeneticOperator {
 
     /// Computes the survival score for a given front's fitness.
     /// This is the only method that needs to be overridden by each survival operator.
-    fn set_survival_score(&self, fronts: &mut Fronts, rng: &mut dyn RandomGenerator);
+    fn set_survival_score(
+        &self,
+        fronts: &mut Fronts,
+        rng: &mut dyn RandomGenerator,
+        algorithm_context: &AlgorithmContext,
+    );
 
     /// Selects the individuals that will survive to the next generation.
     /// The default implementation uses the survival score to select individuals.
     fn operate(
-        &self,
+        &mut self,
         population: Population,
         n_survive: usize,
         rng: &mut dyn RandomGenerator,
+        algorithm_context: &AlgorithmContext,
     ) -> Population {
         // Build fronts
         let mut fronts = build_fronts(population, n_survive);
         // Set survival score
-        self.set_survival_score(&mut fronts, rng);
+        self.set_survival_score(&mut fronts, rng, algorithm_context);
         // Drain all fronts.
         let drained = fronts.drain(..);
         let mut survivors_parts: Vec<Population> = Vec::new();

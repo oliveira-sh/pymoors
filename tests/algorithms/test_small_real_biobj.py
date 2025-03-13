@@ -10,6 +10,7 @@ from pymoors import (
     Nsga2,
     Nsga3,
     Rnsga2,
+    Revea,
     DanAndDenisReferencePoints,
 )
 from pymoors.typing import TwoDArray
@@ -70,7 +71,7 @@ def constraints_biobjective(population_genes: TwoDArray) -> TwoDArray:
             Nsga3,
             {
                 "reference_points": DanAndDenisReferencePoints(
-                    n_reference_points=200, n_objectives=2
+                    n_reference_points=100, n_objectives=2
                 )
             },
         ),
@@ -78,17 +79,22 @@ def constraints_biobjective(population_genes: TwoDArray) -> TwoDArray:
             Nsga3,
             {
                 "reference_points": DanAndDenisReferencePoints(
-                    n_reference_points=200, n_objectives=2
+                    n_reference_points=100, n_objectives=2
                 ).generate()
             },
         ),
         (
             Rnsga2,
-            {"reference_points": np.array([[0.5, 0.5], [0.1, 0.1]]), "epsilon": 0.1},
+            {"reference_points": np.array([[0.8, 0.8], [0.9, 0.9]]), "epsilon": 0.001},
         ),
         (
-            Rnsga2,
-            {"reference_points": np.array([[0.8, 0.8], [0.9, 0.9]]), "epsilon": 0.001},
+            Revea,
+            {
+                "reference_points": DanAndDenisReferencePoints(
+                    n_reference_points=100, n_objectives=2
+                ),
+                "alpha": 2.5,
+            },
         ),
     ],
 )
@@ -112,7 +118,7 @@ def test_small_real_biobjective(algorithm_class, extra_kw):
         n_vars=2,  # We have 2 variables: x,y
         population_size=100,
         n_offsprings=100,
-        num_iterations=100,
+        n_iterations=100,
         mutation_rate=0.1,
         crossover_rate=0.9,
         duplicates_cleaner=CloseDuplicatesCleaner(epsilon=1e-6),
@@ -146,7 +152,7 @@ def test_same_seed_same_result():
         n_vars=2,  # We have 2 variables: x,y
         population_size=50,
         n_offsprings=50,
-        num_iterations=20,
+        n_iterations=20,
         mutation_rate=0.1,
         crossover_rate=0.9,
         duplicates_cleaner=CloseDuplicatesCleaner(epsilon=1e-5),
@@ -164,7 +170,7 @@ def test_same_seed_same_result():
         n_vars=2,  # We have 2 variables: x,y
         population_size=50,
         n_offsprings=50,
-        num_iterations=20,
+        n_iterations=20,
         mutation_rate=0.1,
         crossover_rate=0.9,
         duplicates_cleaner=CloseDuplicatesCleaner(epsilon=1e-8),
