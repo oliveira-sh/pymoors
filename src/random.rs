@@ -107,7 +107,6 @@ impl NoopRandomGenerator {
 }
 
 impl RandomGenerator for NoopRandomGenerator {
-    /// Returns a mutable reference to the underlying `StdRng`.
     fn rng(&mut self) -> &mut dyn RngCore {
         &mut self.dummy
     }
